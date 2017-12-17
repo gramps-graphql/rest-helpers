@@ -1,0 +1,13 @@
+.DS*
+node_modules
+*.log
+.vscode
+
+# Don’t include the built files
+/defaultLogger.js
+/GraphQLConnector.js
+/GraphQLModel.js
+/index.js
+
+# Testing directories
+coverage
