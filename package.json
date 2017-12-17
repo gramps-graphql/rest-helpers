@@ -1,11 +1,17 @@
 {
   "name": "@gramps/rest-helpers",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "REST helper classes for GrAMPS GraphQL data sources.",
   "main": "index.js",
   "repository": "https://github.com/gramps-graphql/rest-helpers.git",
   "author": "Jason Lengstorf <jason@lengstorf.com>",
   "license": "MIT",
+  "files": [
+    "GraphQLConnector.js",
+    "GraphQLModel.js",
+    "defaultLogger.js",
+    "index.js"
+  ],
   "scripts": {
     "prepublish": "yarn build",
     "build": "babel src -d .",
