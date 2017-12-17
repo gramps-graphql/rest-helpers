@@ -1,6 +1,6 @@
 {
   "name": "@gramps/rest-helpers",
-  "version": "1.0.0-beta.2",
+  "version": "1.0.0-beta.3",
   "description": "REST helper classes for GrAMPS GraphQL data sources.",
   "main": "index.js",
   "repository": "https://github.com/gramps-graphql/rest-helpers.git",
