@@ -198,7 +198,7 @@ export default class GraphQLConnector {
    * Configures and sends a POST request to a REST API endpoint.
    * @param  {string} endpoint the API endpoint to send the request to
    * @param  {object} body     optional body to be sent with the request
-   * @param  {object} config   optional configuration for request-promise
+   * @param  {object} options  optional configuration for request-promise
    * @return {Promise}         Promise that resolves with the request result
    */
   post(endpoint, body = {}, options = {}) {
@@ -212,12 +212,24 @@ export default class GraphQLConnector {
    * Configures and sends a PUT request to a REST API endpoint.
    * @param  {string} endpoint the API endpoint to send the request to
    * @param  {object} body     optional body to be sent with the request
-   * @param  {object} config   optional configuration for request-promise
+   * @param  {object} options  optional configuration for request-promise
    * @return {Promise}         Promise that resolves with the request result
    */
   put(endpoint, body = {}, options = {}) {
     return this.mutation(endpoint, 'PUT', {
       body,
+      ...options,
+    });
+  }
+
+  /**
+   * Configures and sends a DELETE request to a REST API endpoint.
+   * @param  {string} endpoint the API endpoint to send the request to
+   * @param  {object} options  optional configuration for request-promise
+   * @return {Promise}         Promise that resolves with the request result
+   */
+  delete(endpoint, options = {}) {
+    return this.mutation(endpoint, 'DELETE', {
       ...options,
     });
   }
