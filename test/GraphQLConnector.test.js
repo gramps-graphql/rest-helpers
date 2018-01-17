@@ -274,7 +274,7 @@ describe('GraphQLConnector', () => {
       const tc = new TestConnector();
 
       tc.apiBaseUri = 'https://example.com';
-      tc.post('/test/put', { test: 'body' });
+      tc.put('/test/put', { test: 'body' });
 
       expect(tc.request).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -289,7 +289,37 @@ describe('GraphQLConnector', () => {
       const tc = new TestConnector();
 
       tc.apiBaseUri = 'https://example.com';
-      tc.post('/test/post', { test: 'body' }, { custom: 'option' });
+      tc.put('/test/put', { test: 'body' }, { custom: 'option' });
+
+      expect(tc.request).toHaveBeenCalledWith(
+        expect.objectContaining({
+          custom: 'option',
+        }),
+      );
+    });
+  });
+
+  describe('delete()', () => {
+    it('sends a properly configured DELETE request', () => {
+      const tc = new TestConnector();
+
+      tc.apiBaseUri = 'https://example.com';
+      tc.delete('/test/delete');
+
+      expect(tc.request).toHaveBeenCalledWith({
+        uri: 'https://example.com/test/delete',
+        json: true,
+        resolveWithFullResponse: true,
+        headers: {},
+        method: 'DELETE',
+      });
+    });
+
+    it('adds custom options as expected', () => {
+      const tc = new TestConnector();
+
+      tc.apiBaseUri = 'https://example.com';
+      tc.delete('/test/delete', { custom: 'option' });
 
       expect(tc.request).toHaveBeenCalledWith(
         expect.objectContaining({
