@@ -299,6 +299,52 @@ describe('GraphQLConnector', () => {
     });
   });
 
+  describe('patch()', () => {
+    it('sends a properly configured PATCH request', () => {
+      const tc = new TestConnector();
+
+      tc.apiBaseUri = 'https://example.com';
+      tc.patch('/test/patch');
+
+      expect(tc.request).toHaveBeenCalledWith({
+        uri: 'https://example.com/test/patch',
+        json: true,
+        resolveWithFullResponse: true,
+        headers: {},
+        method: 'PATCH',
+        body: {},
+      });
+    });
+
+    it('adds the body as expected', () => {
+      const tc = new TestConnector();
+
+      tc.apiBaseUri = 'https://example.com';
+      tc.patch('/test/patch', { test: 'body' });
+
+      expect(tc.request).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: {
+            test: 'body',
+          },
+        }),
+      );
+    });
+
+    it('adds custom options as expected', () => {
+      const tc = new TestConnector();
+
+      tc.apiBaseUri = 'https://example.com';
+      tc.patch('/test/patch', { test: 'body' }, { custom: 'option' });
+
+      expect(tc.request).toHaveBeenCalledWith(
+        expect.objectContaining({
+          custom: 'option',
+        }),
+      );
+    });
+  });
+
   describe('delete()', () => {
     it('sends a properly configured DELETE request', () => {
       const tc = new TestConnector();
