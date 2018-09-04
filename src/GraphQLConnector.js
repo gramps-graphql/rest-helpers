@@ -223,6 +223,20 @@ export default class GraphQLConnector {
   }
 
   /**
+   * Configures and sends a PATCH request to a REST API endpoint.
+   * @param  {string} endpoint the API endpoint to send the request to
+   * @param  {object} body     optional body to be sent with the request
+   * @param  {object} options  optional configuration for request-promise
+   * @return {Promise}         Promise that resolves with the request result
+   */
+  patch(endpoint, body = {}, options = {}) {
+    return this.mutation(endpoint, 'PATCH', {
+      body,
+      ...options,
+    });
+  }
+
+  /**
    * Configures and sends a DELETE request to a REST API endpoint.
    * @param  {string} endpoint the API endpoint to send the request to
    * @param  {object} options  optional configuration for request-promise
