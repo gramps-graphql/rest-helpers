@@ -251,6 +251,19 @@ describe('GraphQLConnector', () => {
         }),
       );
     });
+
+    it('omits the body if the formData option is present', () => {
+      const tc = new TestConnector();
+
+      tc.apiBaseUri = 'https://example.com';
+      tc.post('/test/post', null, { formData: 'blob' });
+
+      expect(tc.request).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          body: {},
+        }),
+      );
+    });
   });
 
   describe('put()', () => {
@@ -297,6 +310,19 @@ describe('GraphQLConnector', () => {
         }),
       );
     });
+
+    it('omits the body if the formData option is present', () => {
+      const tc = new TestConnector();
+
+      tc.apiBaseUri = 'https://example.com';
+      tc.put('/test/put', null, { formData: 'blob' });
+
+      expect(tc.request).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          body: {},
+        }),
+      );
+    });
   });
 
   describe('patch()', () => {
@@ -340,6 +366,19 @@ describe('GraphQLConnector', () => {
       expect(tc.request).toHaveBeenCalledWith(
         expect.objectContaining({
           custom: 'option',
+        }),
+      );
+    });
+
+    it('omits the body if the formData option is present', () => {
+      const tc = new TestConnector();
+
+      tc.apiBaseUri = 'https://example.com';
+      tc.patch('/test/patch', null, { formData: 'blob' });
+
+      expect(tc.request).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          body: {},
         }),
       );
     });
