@@ -195,6 +195,30 @@ export default class GraphQLConnector {
   }
 
   /**
+   * Configures the muation options to correctly set request headers
+   * @param  {object} body     optional body to be sent with the request
+   * @param  {object} options  optional configuration for request-promise
+   * @return {object}          complete request-promise configuration
+   */
+  getMutationOptions(body, options) {
+    const { formData } = options;
+
+    // If there's formData, we omit the body to have the Content-Type header
+    // for file uploads set automatically by request-promise
+    if (formData) {
+      return {
+        ...options,
+      };
+    }
+
+    // Otherwise, we return the body along with any other options
+    return {
+      body,
+      ...options,
+    };
+  }
+
+  /**
    * Configures and sends a POST request to a REST API endpoint.
    * @param  {string} endpoint the API endpoint to send the request to
    * @param  {object} body     optional body to be sent with the request
@@ -202,10 +226,9 @@ export default class GraphQLConnector {
    * @return {Promise}         Promise that resolves with the request result
    */
   post(endpoint, body = {}, options = {}) {
-    return this.mutation(endpoint, 'POST', {
-      body,
-      ...options,
-    });
+    const mutationOptions = this.getMutationOptions(body, options);
+
+    return this.mutation(endpoint, 'POST', mutationOptions);
   }
 
   /**
@@ -216,10 +239,9 @@ export default class GraphQLConnector {
    * @return {Promise}         Promise that resolves with the request result
    */
   put(endpoint, body = {}, options = {}) {
-    return this.mutation(endpoint, 'PUT', {
-      body,
-      ...options,
-    });
+    const mutationOptions = this.getMutationOptions(body, options);
+
+    return this.mutation(endpoint, 'PUT', mutationOptions);
   }
 
   /**
@@ -230,10 +252,9 @@ export default class GraphQLConnector {
    * @return {Promise}         Promise that resolves with the request result
    */
   patch(endpoint, body = {}, options = {}) {
-    return this.mutation(endpoint, 'PATCH', {
-      body,
-      ...options,
-    });
+    const mutationOptions = this.getMutationOptions(body, options);
+
+    return this.mutation(endpoint, 'PATCH', mutationOptions);
   }
 
   /**
