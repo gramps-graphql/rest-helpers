@@ -82,13 +82,11 @@ export default class GraphQLConnector {
       const hasCache = this.enableCache && this.getCached(key, resolve, reject);
 
       this.request(this.getRequestConfig(uri))
-        .then(response => {
-          const data = options.resolveWithHeaders
-            ? { ...response.headers, ...response.body }
-            : response.body;
+        .then(({ headers, body, statusCode }) => {
+          const data = options.resolveWithHeaders ? { headers, body } : body;
 
           // If the data came through alright, cache it.
-          if (response.statusCode === 200) {
+          if (statusCode === 200) {
             this.addToCache(key, data);
           }
 
