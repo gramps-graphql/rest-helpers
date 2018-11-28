@@ -185,8 +185,12 @@ describe('GraphQLConnector', () => {
         .getRequestData('https://example.com', { resolveWithHeaders: true })
         .then(result => {
           expect(result).toEqual({
-            'content-type': 'application/json',
-            test: 'body',
+            headers: {
+              'content-type': 'application/json',
+            },
+            body: {
+              test: 'body',
+            },
           });
           expect(tc.redis.setex).toHaveBeenCalled();
         });
