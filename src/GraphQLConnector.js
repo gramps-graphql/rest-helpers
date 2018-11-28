@@ -67,9 +67,11 @@ export default class GraphQLConnector {
   /**
    * Executes a request for data from a given URI
    * @param  {string}  uri  the URI to load
+   * @param  {object}  options
+   * @param  {boolean} options.resolveWithHeaders returns the headers along with the response body
    * @return {Promise}      resolves with the loaded data; rejects with errors
    */
-  getRequestData = uri =>
+  getRequestData = (uri, options = {}) =>
     new Promise((resolve, reject) => {
       this.logger.info(`Request made to ${uri}`);
       const toHash = `${uri}-${this.headers.Authorization}`;
@@ -81,7 +83,9 @@ export default class GraphQLConnector {
 
       this.request(this.getRequestConfig(uri))
         .then(response => {
-          const data = response.body;
+          const data = options.resolveWithHeaders
+            ? { ...response.headers, ...response.body }
+            : response.body;
 
           // If the data came through alright, cache it.
           if (response.statusCode === 200) {
@@ -160,11 +164,16 @@ export default class GraphQLConnector {
   /**
    * Configures and sends a GET request to a REST API endpoint.
    * @param  {string}  endpoint the API endpoint to send the request to
-   * @param  {object}  config   optional configuration for the request
+   * @param  {object}  options   optional configuration for the request
    * @return {Promise}          Promise that resolves with the request result
    */
-  get(endpoint) {
+  get(endpoint, options) {
     this.createLoader();
+
+    // If additional options are needed, we bypass the dataloader
+    if (options) {
+      return this.getRequestData(`${this.apiBaseUri}${endpoint}`, options);
+    }
 
     return this.loader.load(`${this.apiBaseUri}${endpoint}`);
   }
