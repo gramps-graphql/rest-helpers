@@ -8,6 +8,9 @@ jest.mock('request-promise', () =>
   jest.fn(() =>
     Promise.resolve({
       statusCode: 200,
+      headers: {
+        'content-type': 'application/json',
+      },
       body: {
         test: 'body',
       },
@@ -171,6 +174,23 @@ describe('GraphQLConnector', () => {
         );
       });
     });
+
+    it('resolves with response headers if specified', async () => {
+      expect.assertions(2);
+      const tc = new TestConnector();
+
+      tc.redis = mockRedis.getClient();
+
+      return tc
+        .getRequestData('https://example.com', { resolveWithHeaders: true })
+        .then(result => {
+          expect(result).toEqual({
+            'content-type': 'application/json',
+            test: 'body',
+          });
+          expect(tc.redis.setex).toHaveBeenCalled();
+        });
+    });
   });
 
   describe('load()', async () => {
@@ -204,6 +224,21 @@ describe('GraphQLConnector', () => {
       expect(tc.load).toHaveBeenCalledWith([
         'https://example.com/test/endpoint',
       ]);
+    });
+
+    it('bypasses the DataLoader if additional options are passed in', () => {
+      const tc = new TestConnector();
+
+      tc.apiBaseUri = 'https://example.com';
+
+      tc.getRequestData = jest.fn(() => Promise.resolve({}));
+
+      tc.get('/test/endpoint', { foo: 'bar' });
+
+      expect(tc.getRequestData).toHaveBeenCalledWith(
+        'https://example.com/test/endpoint',
+        { foo: 'bar' },
+      );
     });
   });
 
