@@ -76,6 +76,10 @@ describe('GraphQLConnector', () => {
 
       tc.redis = mockRedis.getClient();
 
+      tc.redis.get = jest.fn((key, cb) => {
+        cb(null, '{"test":"body"}');
+      });
+
       return tc.getRequestData('https://example.com').then(result => {
         expect(result).toEqual({ test: 'body' });
         expect(tc.redis.setex).toHaveBeenCalled();
@@ -147,6 +151,7 @@ describe('GraphQLConnector', () => {
         }),
       );
 
+      tc.getCached = jest.fn((uri, resolve) => resolve());
       tc.addToCache = jest.fn();
 
       const result = await tc.getRequestData('https://example.com/');
@@ -161,6 +166,7 @@ describe('GraphQLConnector', () => {
       const tc = new TestConnector();
 
       tc.request = () => Promise.reject(Error('test error'));
+      tc.getCached = jest.fn((uri, resolve) => resolve());
 
       return tc.getRequestData('https://example.com/rejectme').catch(error => {
         expect(error).toHaveProperty('isBoom', true);
@@ -173,13 +179,14 @@ describe('GraphQLConnector', () => {
           expect.stringMatching(/test error/),
         );
       });
-    });
+    });   
 
     it('resolves with response headers if specified', async () => {
       expect.assertions(2);
       const tc = new TestConnector();
 
       tc.redis = mockRedis.getClient();
+      tc.getCached = jest.fn((uri, resolve) => resolve());
 
       return tc
         .getRequestData('https://example.com', { resolveWithHeaders: true })
@@ -193,6 +200,127 @@ describe('GraphQLConnector', () => {
             },
           });
           expect(tc.redis.setex).toHaveBeenCalled();
+        });
+    });
+
+    it('does not cache if specified in options', async () => {
+      expect.assertions(3);
+      const tc = new TestConnector();
+
+      tc.redis = mockRedis.getClient();
+
+      return tc
+        .getRequestData('https://example.com', { cacheExpiry: 0 })
+        .then(result => {
+          expect(result).toEqual({ test: 'body' });
+          expect(tc.redis.get).not.toHaveBeenCalled();
+          expect(tc.redis.setex).not.toHaveBeenCalled();
+        });
+    });
+
+    it('Caches for a longer time if passed in custom cache time in options', async () => {
+      expect.assertions(4);
+      const tc = new TestConnector();
+
+      tc.redis = mockRedis.getClient();
+      tc.redis.get = jest.fn((key, cb) => {
+        cb(null, '{"test":"body"}');
+      });
+
+      return tc
+        .getRequestData('https://example.com', { cacheExpiry: 36000 })
+        .then(result => {
+          expect(result).toEqual({ test: 'body' });
+          expect(tc.redis.get).toHaveBeenCalled();
+          expect(tc.redis.setex.mock.calls[0][1]).toEqual(36000);
+          expect(tc.redis.setex.mock.calls[0][2]).toEqual('{"test":"body"}');
+        });
+    });
+
+    it('Sets a second key in redis to keep track of when not to call API call if option is passed in', async () => {
+      expect.assertions(7);
+      const tc = new TestConnector();
+
+      tc.redis = mockRedis.getClient();
+      tc.redis.get = jest.fn((key, cb) => {
+        cb(null, null);
+      });
+
+      return tc
+        .getRequestData('https://example.com', {
+          cacheRefresh: 1800,
+          cacheExpiry: 36000,
+        })
+        .then(result => {
+          expect(result).toEqual({ test: 'body' });
+          expect(tc.redis.get).toHaveBeenCalled();
+          const redisKey = tc.redis.setex.mock.calls[1][0];
+          expect(tc.redis.setex.mock.calls[0][0]).toEqual(
+            `REFRESH_CACHE_${redisKey}`,
+          );
+          expect(tc.redis.setex.mock.calls[0][1]).toEqual(1800);
+          expect(tc.redis.setex.mock.calls[0][2]).toEqual('true');
+          expect(tc.redis.setex.mock.calls[1][1]).toEqual(36000);
+          expect(tc.redis.setex.mock.calls[1][2]).toEqual('{"test":"body"}');
+        });
+    });
+
+    it('checks if refresh cache is needed, and if key is still set, do not make request', async () => {
+      expect.assertions(4);
+      const tc = new TestConnector();
+
+      tc.makeRequest = jest.fn();
+      tc.redis = mockRedis.getClient();
+      tc.redis.get = jest.fn((key, cb) => {
+        if(key.indexOf('REFRESH') !== -1) {
+          cb(null, 'true');
+        } else {
+          cb(null, '{"test":"body"}');
+        }
+      });
+
+      return tc
+        .getRequestData('https://example.com', {
+          cacheRefresh: 1800,
+          cacheExpiry: 36000,
+        })
+        .then(result => {
+          expect(result).toEqual({ test: 'body' });
+          expect(tc.makeRequest).not.toHaveBeenCalled();
+          expect(tc.redis.get).toHaveBeenCalledTimes(2);
+          expect(tc.redis.setex).not.toHaveBeenCalled();
+        });
+    });
+
+    it('checks if refresh cache is needed, and if key is not set, make request', async () => {
+      expect.assertions(7);
+      const tc = new TestConnector();
+
+      tc.redis = mockRedis.getClient();
+      tc.redis.get = jest.fn((key, cb) => {
+        if(key.indexOf('REFRESH') !== -1) {
+          cb(null, null);
+        } else {
+          cb(null, '{"test":"body"}');
+        }
+      });
+
+      return tc
+        .getRequestData('https://example.com', {
+          cacheRefresh: 1800,
+          cacheExpiry: 36000,
+        })
+        .then(result => {
+          expect(result).toEqual({ test: 'body' });
+          expect(tc.redis.get).toHaveBeenCalledTimes(2);
+          const redisKey = tc.redis.setex.mock.calls[1][0];
+          expect(tc.redis.setex.mock.calls[0][0]).toEqual(
+            `REFRESH_CACHE_${redisKey}`,
+          );
+          expect(tc.redis.setex.mock.calls[0][1]).toEqual(1800);
+          expect(tc.redis.setex.mock.calls[0][2]).toEqual('true');
+          expect(tc.redis.setex.mock.calls[1][1]).toEqual(36000);
+          expect(tc.redis.setex.mock.calls[1][2]).toEqual('{"test":"body"}');
         });
     });
   });
