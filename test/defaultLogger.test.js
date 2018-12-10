@@ -2,6 +2,7 @@
 import defaultLogger from '../src/defaultLogger';
 
 describe('defaultLogger', () => {
+  //matches timestamp
   const stringMatches = expect.stringMatching(/[.*]/);
   it('uses the console for info logging', () => {
     console.info = jest.fn();
