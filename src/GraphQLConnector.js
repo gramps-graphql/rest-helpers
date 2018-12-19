@@ -2,11 +2,14 @@ import crypto from 'crypto';
 import DataLoader from 'dataloader';
 import rp from 'request-promise';
 import { GrampsError } from '@gramps/errors';
+import {
+  getCached,
+  isCacheEnabled,
+  addToCache,
+  refreshCache,
+} from './cacheUtils';
 
 import defaultLogger from './defaultLogger';
-
-const REFRESH_CACHE_PREFIX_KEY = 'REFRESH_CACHE_';
-
 /**
  * An abstract class to lay groundwork for data connectors.
  */
@@ -66,25 +69,6 @@ export default class GraphQLConnector {
     headers: { ...this.headers },
   });
 
-  isCacheEnabled = options => {
-    if (!this.redis || !this.enableCache) {
-      return false;
-    }
-    if (options && options.cacheExpiry === 0) {
-      return false;
-    }
-    return true;
-  };
-
-  refreshCache = (uri, options, key) => {
-    this.redis.get(`${REFRESH_CACHE_PREFIX_KEY}${key}`, (error, data) => {
-      if (data !== 'true') {
-        //Key expired, means it's time to refresh cache;
-        this.makeRequest(uri, options, key);
-      }
-    });
-  };
-
   makeRequest = (uri, options, key, resolve, reject = () => {}) => {
     this.logger.info(`Making request to ${this.getShortUri(uri)}`);
     this.request(this.getRequestConfig(uri))
@@ -93,7 +77,7 @@ export default class GraphQLConnector {
 
         // If the data came through alright, cache it.
         if (statusCode === 200) {
-          this.addToCache(key, uri, options, data);
+          addToCache(this, key, uri, options, data);
         }
 
         return data;
@@ -131,11 +115,11 @@ export default class GraphQLConnector {
         .createHash('md5')
         .update(toHash)
         .digest('hex');
-      const hasCache = this.isCacheEnabled(options);
+      const hasCache = isCacheEnabled(this, options);
 
       if (hasCache) {
-        const redisPromise = new Promise(redisResolve => {
-          this.getCached(key, redisResolve, reject);
+        new Promise(redisResolve => {
+          getCached(this, key, redisResolve, reject);
         }).then(result => {
           if (!result) {
             //Not found in cache, proceed to make the request
@@ -144,12 +128,12 @@ export default class GraphQLConnector {
           }
           if (options && options.cacheRefresh > 0) {
             //We have specified that we only want to refresh the cache conditionally, so we will check if it's time to do so
-            this.refreshCache(uri, options, key);
-            resolve(result); //Found in cache, resolve right away with cached result
+            refreshCache(this, uri, options, key);
+            resolve(result); //Found in cache, resolve with cached result
             return;
           }
-          this.makeRequest(uri, options, key, null, reject); //we already resolved, now just make request to refresh cache
-          resolve(result); //Found in cache, resolve right away with cached result
+          this.makeRequest(uri, options, key, null, reject); //make request to refresh cache
+          resolve(result); //Found in cache, resolve with cached result
         });
       } else {
         this.makeRequest(uri, options, key, resolve, reject);
@@ -164,77 +148,6 @@ export default class GraphQLConnector {
   load = uris => Promise.all(uris.map(this.getRequestData));
 
   getShortUri = uri => uri.split('?')[0];
-
-  getCustomOptions = options => {
-    let expiry = this.cacheExpiry;
-    let setCustomRefresh = false;
-    let setCache = true;
-    if (options.cacheExpiry === 0) {
-      setCache = false;
-    } else if (options.cacheExpiry > 0) {
-      expiry = options.cacheExpiry;
-    }
-    if (options.cacheRefresh > 0) {
-      setCustomRefresh = options.cacheRefresh;
-    }
-    return { expiry, setCustomRefresh, setCache };
-  };
-
-  /**
-   * Stores given data in the cache for a set amount of time.
-   * @param  {string} key      an MD5 hash of the request URI
-   * @param  {object} response the data to be cached
-   * @return {object}          the response, unchanged
-   */
-  addToCache(key, uri, options, response) {
-    if (!this.enableCache) {
-      return;
-    }
-    const { expiry, setCustomRefresh, setCache } = this.getCustomOptions(
-      options,
-    );
-    if (setCache === false) {
-      return; //cache is set to 0, so do not store to cache
-    }
-    if (setCustomRefresh !== false) {
-      //Custom refresh is set to true, save a redix key that indicates while present we do not want to call the api and refresh cache
-      this.redis.setex(
-        `${REFRESH_CACHE_PREFIX_KEY}${key}`,
-        setCustomRefresh,
-        'true',
-      );
-    }
-    const shortUri = this.getShortUri(uri);
-    this.logger.info(
-      `caching response data for ${shortUri} for ${expiry} seconds`,
-    );
-    this.redis.setex(key, expiry, JSON.stringify(response));
-  }
-
-  /**
-   * Loads data from the cache, if available.
-   * @param  {string}   key       the cache identifier key
-   * @param  {function} successCB typically a Promise's `resolve` function
-   * @param  {function} errorCB   typically a Promise's `reject` function
-   * @return {boolean}            true if cached data was found, false otherwise
-   */
-  getCached(key, successCB, errorCB) {
-    this.redis.get(key, (error, data) => {
-      if (error) {
-        errorCB(error);
-      }
-
-      // If we have data, initiate a refetch in the background and return it.
-      if (data !== null) {
-        this.logger.info('loading data from cache');
-
-        // The success callback will typically resolve a Promise.
-        successCB(JSON.parse(data));
-      } else {
-        successCB(null);
-      }
-    });
-  }
 
   /**
    * Configures and sends a GET request to a REST API endpoint.
