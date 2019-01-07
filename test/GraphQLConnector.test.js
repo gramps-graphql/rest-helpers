@@ -143,6 +143,9 @@ describe('GraphQLConnector', () => {
       const tc = new TestConnector();
 
       tc.redis = mockRedis.getClient();
+      tc.redis.get = jest.fn((key, cb) => {
+        cb(null, null);
+      });
 
       tc.request.mockReturnValueOnce(
         Promise.resolve({
@@ -151,22 +154,22 @@ describe('GraphQLConnector', () => {
         }),
       );
 
-      tc.getCached = jest.fn((uri, resolve) => resolve());
-      tc.addToCache = jest.fn();
-
       const result = await tc.getRequestData('https://example.com/');
 
       expect(result).toEqual({});
-      expect(tc.addToCache).not.toHaveBeenCalled();
+      expect(tc.redis.setex).not.toHaveBeenCalled();
     });
 
     it('throws a GrampsError if something goes wrong', async () => {
       expect.assertions(5);
 
       const tc = new TestConnector();
+      tc.redis = mockRedis.getClient();
 
       tc.request = () => Promise.reject(Error('test error'));
-      tc.getCached = jest.fn((uri, resolve) => resolve());
+      tc.redis.get = jest.fn((key, cb) => {
+        cb(null, null);
+      });
 
       return tc.getRequestData('https://example.com/rejectme').catch(error => {
         expect(error).toHaveProperty('isBoom', true);
@@ -179,14 +182,16 @@ describe('GraphQLConnector', () => {
           expect.stringMatching(/test error/),
         );
       });
-    });   
+    });
 
     it('resolves with response headers if specified', async () => {
       expect.assertions(2);
       const tc = new TestConnector();
 
       tc.redis = mockRedis.getClient();
-      tc.getCached = jest.fn((uri, resolve) => resolve());
+      tc.redis.get = jest.fn((key, cb) => {
+        cb(null, null);
+      });
 
       return tc
         .getRequestData('https://example.com', { resolveWithHeaders: true })
@@ -272,7 +277,7 @@ describe('GraphQLConnector', () => {
       tc.makeRequest = jest.fn();
       tc.redis = mockRedis.getClient();
       tc.redis.get = jest.fn((key, cb) => {
-        if(key.indexOf('REFRESH') !== -1) {
+        if (key.indexOf('REFRESH') !== -1) {
           cb(null, 'true');
         } else {
           cb(null, '{"test":"body"}');
@@ -298,7 +303,7 @@ describe('GraphQLConnector', () => {
 
       tc.redis = mockRedis.getClient();
       tc.redis.get = jest.fn((key, cb) => {
-        if(key.indexOf('REFRESH') !== -1) {
+        if (key.indexOf('REFRESH') !== -1) {
           cb(null, null);
         } else {
           cb(null, '{"test":"body"}');

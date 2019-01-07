@@ -40,9 +40,8 @@ const addToCache = (connector, key, uri, options, response) => {
       'true',
     );
   }
-  const shortUri = connector.getShortUri(uri);
   connector.logger.info(
-    `caching response data for ${shortUri} for ${expiry} seconds`,
+    `caching response data for ${uri} for ${expiry} seconds`,
   );
   connector.redis.setex(key, expiry, JSON.stringify(response));
 };

@@ -70,7 +70,7 @@ export default class GraphQLConnector {
   });
 
   makeRequest = (uri, options, key, resolve, reject = () => {}) => {
-    this.logger.info(`Making request to ${this.getShortUri(uri)}`);
+    this.logger.info(`Making request to ${uri}`);
     this.request(this.getRequestConfig(uri))
       .then(({ headers, body, statusCode }) => {
         const data = options.resolveWithHeaders ? { headers, body } : body;
@@ -120,21 +120,25 @@ export default class GraphQLConnector {
       if (hasCache) {
         new Promise(redisResolve => {
           getCached(this, key, redisResolve, reject);
-        }).then(result => {
-          if (!result) {
-            //Not found in cache, proceed to make the request
-            this.makeRequest(uri, options, key, resolve, reject);
-            return;
-          }
-          if (options && options.cacheRefresh > 0) {
-            //We have specified that we only want to refresh the cache conditionally, so we will check if it's time to do so
-            refreshCache(this, uri, options, key);
+        })
+          .then(result => {
+            if (!result) {
+              //Not found in cache, proceed to make the request
+              this.makeRequest(uri, options, key, resolve, reject);
+              return;
+            }
+            if (options && options.cacheRefresh > 0) {
+              //We have specified that we only want to refresh the cache conditionally, so we will check if it's time to do so
+              refreshCache(this, uri, options, key);
+              resolve(result); //Found in cache, resolve with cached result
+              return;
+            }
+            this.makeRequest(uri, options, key, null, reject); //make request to refresh cache
             resolve(result); //Found in cache, resolve with cached result
-            return;
-          }
-          this.makeRequest(uri, options, key, null, reject); //make request to refresh cache
-          resolve(result); //Found in cache, resolve with cached result
-        });
+          })
+          .catch(err => {
+            reject(err);
+          });
       } else {
         this.makeRequest(uri, options, key, resolve, reject);
       }
@@ -146,8 +150,6 @@ export default class GraphQLConnector {
    * @return {Promise}      the response from all requested URIs
    */
   load = uris => Promise.all(uris.map(this.getRequestData));
-
-  getShortUri = uri => uri.split('?')[0];
 
   /**
    * Configures and sends a GET request to a REST API endpoint.
