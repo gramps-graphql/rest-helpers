@@ -2,9 +2,14 @@ import crypto from 'crypto';
 import DataLoader from 'dataloader';
 import rp from 'request-promise';
 import { GrampsError } from '@gramps/errors';
+import {
+  getCached,
+  isCacheEnabled,
+  addToCache,
+  refreshCache,
+} from './cacheUtils';
 
 import defaultLogger from './defaultLogger';
-
 /**
  * An abstract class to lay groundwork for data connectors.
  */
@@ -25,7 +30,7 @@ export default class GraphQLConnector {
   request = rp;
 
   /**
-   * How long to cache GET requests.
+   * How long to cache GET requests by default.
    * @type {number}
    */
   cacheExpiry = 300;
@@ -64,47 +69,79 @@ export default class GraphQLConnector {
     headers: { ...this.headers },
   });
 
+  makeRequest = (uri, options, key, resolve, reject = () => {}) => {
+    this.logger.info(`Making request to ${uri}`);
+    this.request(this.getRequestConfig(uri))
+      .then(({ headers, body, statusCode }) => {
+        const data = options.resolveWithHeaders ? { headers, body } : body;
+
+        // If the data came through alright, cache it.
+        if (statusCode === 200) {
+          addToCache(this, key, uri, options, data);
+        }
+
+        return data;
+      })
+      .then(response => resolve && resolve(response))
+      .catch(error => {
+        const err = GrampsError({
+          error,
+          description: `There was an error with the query: ${error.message}`,
+          docsLink: 'https://ibm.biz/graphql',
+          errorCode: 'GRAPHQL_QUERY_ERROR',
+          graphqlModel: this.constructor.name,
+          targetEndpoint: uri,
+        });
+        reject(err);
+      });
+  };
+
   /**
    * Executes a request for data from a given URI
    * @param  {string}  uri  the URI to load
    * @param  {object}  options
    * @param  {boolean} options.resolveWithHeaders returns the headers along with the response body
+   * @param  {number}  options.cacheExpiry: number of seconds to cache this API request instead of using default expiration.
+   *                                        Passing in 0 indicates you want this to NOT get cached at all
+   * @param  {number}  options.cacheRefresh: If this is passed in, number of seconds that must elapse before the GET uri is called
+   *                                         to update the cache for this API. By default, it gets called every time, but if data rarely changes and
+   *                                         it is an expensive API call, you have the option to return the cache and exit.
    * @return {Promise}      resolves with the loaded data; rejects with errors
    */
   getRequestData = (uri, options = {}) =>
     new Promise((resolve, reject) => {
-      this.logger.info(`Request made to ${uri}`);
       const toHash = `${uri}-${this.headers.Authorization}`;
       const key = crypto
         .createHash('md5')
         .update(toHash)
         .digest('hex');
-      const hasCache = this.enableCache && this.getCached(key, resolve, reject);
+      const hasCache = isCacheEnabled(this, options);
 
-      this.request(this.getRequestConfig(uri))
-        .then(({ headers, body, statusCode }) => {
-          const data = options.resolveWithHeaders ? { headers, body } : body;
-
-          // If the data came through alright, cache it.
-          if (statusCode === 200) {
-            this.addToCache(key, data);
-          }
-
-          return data;
+      if (hasCache) {
+        new Promise(redisResolve => {
+          getCached(this, key, redisResolve, reject);
         })
-        .then(response => !hasCache && resolve(response))
-        .catch(error => {
-          const err = GrampsError({
-            error,
-            description: `There was an error with the query: ${error.message}`,
-            docsLink: 'https://ibm.biz/graphql',
-            errorCode: 'GRAPHQL_QUERY_ERROR',
-            graphqlModel: this.constructor.name,
-            targetEndpoint: uri,
+          .then(result => {
+            if (!result) {
+              //Not found in cache, proceed to make the request
+              this.makeRequest(uri, options, key, resolve, reject);
+              return;
+            }
+            if (options && options.cacheRefresh > 0) {
+              //We have specified that we only want to refresh the cache conditionally, so we will check if it's time to do so
+              refreshCache(this, uri, options, key);
+              resolve(result); //Found in cache, resolve with cached result
+              return;
+            }
+            this.makeRequest(uri, options, key, null, reject); //make request to refresh cache
+            resolve(result); //Found in cache, resolve with cached result
+          })
+          .catch(err => {
+            reject(err);
           });
-
-          reject(err);
-        });
+      } else {
+        this.makeRequest(uri, options, key, resolve, reject);
+      }
     });
 
   /**
@@ -113,51 +150,6 @@ export default class GraphQLConnector {
    * @return {Promise}      the response from all requested URIs
    */
   load = uris => Promise.all(uris.map(this.getRequestData));
-
-  /**
-   * Stores given data in the cache for a set amount of time.
-   * @param  {string} key      an MD5 hash of the request URI
-   * @param  {object} response the data to be cached
-   * @return {object}          the response, unchanged
-   */
-  addToCache(key, response) {
-    if (this.redis && this.enableCache) {
-      this.logger.info(`caching response data for ${this.cacheExpiry} seconds`);
-      this.redis.setex(key, this.cacheExpiry, JSON.stringify(response));
-    }
-
-    return response;
-  }
-
-  /**
-   * Loads data from the cache, if available.
-   * @param  {string}   key       the cache identifier key
-   * @param  {function} successCB typically a Promise’s `resolve` function
-   * @param  {function} errorCB   typically a Promise’s `reject` function
-   * @return {boolean}            true if cached data was found, false otherwise
-   */
-  getCached(key, successCB, errorCB) {
-    if (!this.redis) {
-      return;
-    }
-
-    this.redis.get(key, (error, data) => {
-      if (error) {
-        errorCB(error);
-      }
-
-      // If we have data, initiate a refetch in the background and return it.
-      if (data !== null) {
-        this.logger.info('loading data from cache');
-
-        // The success callback will typically resolve a Promise.
-        successCB(JSON.parse(data));
-        return true;
-      }
-
-      return false;
-    });
-  }
 
   /**
    * Configures and sends a GET request to a REST API endpoint.
