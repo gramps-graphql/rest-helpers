@@ -10,6 +10,7 @@
     "GraphQLConnector.js",
     "GraphQLModel.js",
     "defaultLogger.js",
+    "cacheUtils.js",
     "index.js"
   ],
   "scripts": {
