@@ -89,4 +89,5 @@ const refreshCache = (connector, uri, options, key) => {
     }
   });
 };
-export { addToCache, isCacheEnabled, getCached, refreshCache };
+
+export default { addToCache, isCacheEnabled, getCached, refreshCache };

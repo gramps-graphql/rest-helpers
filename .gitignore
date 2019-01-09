@@ -4,6 +4,7 @@ node_modules
 .vscode
 
 # Don’t include the built files
+/cacheUtils.js
 /defaultLogger.js
 /GraphQLConnector.js
 /GraphQLModel.js
