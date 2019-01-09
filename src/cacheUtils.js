@@ -21,7 +21,7 @@ const getCustomCacheOptions = (connector, options) => {
  * @param  {object} response the data to be cached
  * @return {object}          the response, unchanged
  */
-const addToCache = (connector, key, uri, options, response) => {
+export const addToCache = (connector, key, uri, options, response) => {
   if (!connector.enableCache) {
     return;
   }
@@ -53,7 +53,7 @@ const addToCache = (connector, key, uri, options, response) => {
  * @param  {function} errorCB   typically a Promise's `reject` function
  * @return {boolean}            true if cached data was found, false otherwise
  */
-const getCached = (connector, key, successCB, errorCB) => {
+export const getCached = (connector, key, successCB, errorCB) => {
   connector.redis.get(key, (error, data) => {
     if (error) {
       errorCB(error);
@@ -71,7 +71,7 @@ const getCached = (connector, key, successCB, errorCB) => {
   });
 };
 
-const isCacheEnabled = (connector, options) => {
+export const isCacheEnabled = (connector, options) => {
   if (!connector.redis || !connector.enableCache) {
     return false;
   }
@@ -81,7 +81,7 @@ const isCacheEnabled = (connector, options) => {
   return true;
 };
 
-const refreshCache = (connector, uri, options, key) => {
+export const refreshCache = (connector, uri, options, key) => {
   connector.redis.get(`${REFRESH_CACHE_PREFIX_KEY}${key}`, (error, data) => {
     if (data !== 'true') {
       //Key expired, means it's time to refresh cache;
