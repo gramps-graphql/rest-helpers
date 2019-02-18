@@ -62,16 +62,16 @@ export default class GraphQLConnector {
    * @param  {string} uri the URI where the request should be sent
    * @return {object}
    */
-  getRequestConfig = uri => ({
+  getRequestConfig = (uri, options = {}) => ({
     uri,
     json: true,
     resolveWithFullResponse: true,
-    headers: { ...this.headers },
+    headers: { ...this.headers, ...options.headers },
   });
 
   makeRequest = (uri, options, key, resolve, reject = () => {}) => {
     this.logger.info(`Making request to ${uri}`);
-    this.request(this.getRequestConfig(uri))
+    this.request(this.getRequestConfig(uri, options))
       .then(({ headers, body, statusCode }) => {
         const data = options.resolveWithHeaders ? { headers, body } : body;
 
@@ -99,18 +99,21 @@ export default class GraphQLConnector {
   /**
    * Executes a request for data from a given URI
    * @param  {string}  uri  the URI to load
-   * @param  {object}  options
-   * @param  {boolean} options.resolveWithHeaders returns the headers along with the response body
-   * @param  {number}  options.cacheExpiry: number of seconds to cache this API request instead of using default expiration.
+   * @param  {object}  args
+   * @param  {boolean} args.resolveWithHeaders returns the headers along with the response body
+   * @param  {number}  args.cacheExpiry: number of seconds to cache this API request instead of using default expiration.
    *                                        Passing in 0 indicates you want this to NOT get cached at all
-   * @param  {number}  options.cacheRefresh: If this is passed in, number of seconds that must elapse before the GET uri is called
+   * @param  {number}  args.cacheRefresh: If this is passed in, number of seconds that must elapse before the GET uri is called
    *                                         to update the cache for this API. By default, it gets called every time, but if data rarely changes and
    *                                         it is an expensive API call, you have the option to return the cache and exit.
    * @return {Promise}      resolves with the loaded data; rejects with errors
    */
-  getRequestData = (uri, options = {}) =>
+  getRequestData = (uri, args = {}) =>
     new Promise((resolve, reject) => {
-      const toHash = `${uri}-${this.headers.Authorization}`;
+      const headers = typeof args === 'object' ? args.headers : {};
+      const headerParams = { ...this.headers, ...headers };
+      const options = { ...args, headers: headerParams };
+      const toHash = `${uri}-${headerParams.Authorization}`;
       const key = crypto
         .createHash('md5')
         .update(toHash)
@@ -181,7 +184,7 @@ export default class GraphQLConnector {
   mutation(endpoint, method, options) {
     const config = {
       // Start with our baseline configuration.
-      ...this.getRequestConfig(`${this.apiBaseUri}${endpoint}`),
+      ...this.getRequestConfig(`${this.apiBaseUri}${endpoint}`, options),
 
       // Add some PUT-specific options.
       method,
