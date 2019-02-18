@@ -46,6 +46,17 @@ export const addToCache = (connector, key, uri, options, response) => {
   connector.redis.setex(key, expiry, JSON.stringify(response));
 };
 
+const returnData = (successCB, data) => {
+  // The success callback will typically resolve a Promise.
+  try {
+    successCB(JSON.parse(data));
+  } catch (e) {
+    //if for some reason there was a network error and the string saved was truncated (not a proper JSON object) then the parse
+    //will fail, so in that case, just return null so that we force the api to refresh the cache with good data.
+    successCB(null);
+  }
+};
+
 /**
  * Loads data from the cache, if available.
  * @param  {string}   key       the cache identifier key
@@ -62,9 +73,7 @@ export const getCached = (connector, key, successCB, errorCB) => {
     // If we have data, initiate a refetch in the background and return it.
     if (data !== null) {
       connector.logger.info('loading data from cache');
-
-      // The success callback will typically resolve a Promise.
-      successCB(JSON.parse(data));
+      returnData(successCB, data);
     } else {
       successCB(null);
     }

@@ -106,6 +106,26 @@ describe('GraphQLConnector', () => {
       });
     });
 
+    it('resolves with body of request if cache is bad', async () => {
+      expect.assertions(2);
+
+      const tc = new TestConnector();
+
+      tc.redis = mockRedis.getClient();
+
+      // Mock the Redis get method to return cached data.
+      tc.redis.get = jest.fn((key, cb) => {
+        cb(null, '{"test":"truncated');
+      });
+
+      return tc.getRequestData('https://example.com').then(result => {
+        expect(result).toEqual({ test: 'body' });
+
+        // It should still make the request in the background, though.
+        expect(tc.request).toHaveBeenCalled();
+      });
+    });
+
     it('rejects if there is an error with Redis', async () => {
       expect.assertions(1);
 
