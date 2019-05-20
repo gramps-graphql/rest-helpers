@@ -605,4 +605,34 @@ describe('GraphQLConnector', () => {
       );
     });
   });
+
+  describe('head()', () => {
+    it('sends a properly configured HEAD request', () => {
+      const tc = new TestConnector();
+
+      tc.apiBaseUri = 'https://example.com';
+      tc.head('/test/head');
+
+      expect(tc.request).toHaveBeenCalledWith({
+        uri: 'https://example.com/test/head',
+        json: true,
+        resolveWithFullResponse: true,
+        headers: {},
+        method: 'HEAD',
+      });
+    });
+
+    it('adds custom options as expected', () => {
+      const tc = new TestConnector();
+
+      tc.apiBaseUri = 'https://example.com';
+      tc.head('/test/head', { custom: 'option' });
+
+      expect(tc.request).toHaveBeenCalledWith(
+        expect.objectContaining({
+          custom: 'option',
+        }),
+      );
+    });
+  });
 });
