@@ -271,6 +271,18 @@ export default class GraphQLConnector {
     });
   }
 
+  /**
+   * Configures and sends a HEAD request to a REST API endpoint.
+   * @param  {string} endpoint the API endpoint to send the request to
+   * @param  {object} options  optional configuration for request-promise
+   * @return {Promise}         Promise that resolves with the request result
+   */
+  head(endpoint, options = {}) {
+    return this.mutation(endpoint, 'HEAD', {
+      ...options,
+    });
+  }
+
   createLoader() {
     // We can enable batched queries later on, which may be more performant.
     this.loader = new DataLoader(this.load, {
